@@ -5,12 +5,16 @@ from django.http import JsonResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from .customer_producer import RabbitMQProducer
+
+customerProducer = RabbitMQProducer(exchange_name="customerCatalog")
 
 @api_view(['POST'])
 def addUser(request) :
     serializer = UserSerializer(data = request.data)
     if serializer.is_valid():
         serializer.save()
+        customerProducer.publish("user_created",serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.error_messages, status=status.HTTP_400_BAD_REQUEST)
 
@@ -27,11 +31,16 @@ def userDetail(request, id) :
     except :
         return Response(status=status.HTTP_404_NOT_FOUND)
     
+    email = user.email
     if request.method == 'PUT':
         serializer = UserSerializer(user, data= request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
+            try : 
+                serializer.save()
+                customerProducer.publish("user_updated",{**serializer.data,"old-email":email})
+                return Response(serializer.data)
+            except Exception as e:
+                return Response(e,status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     else:
         serializer = UserSerializer(user)
@@ -44,5 +53,7 @@ def deleteUser(request, id) :
     except :
         return Response(status=status.HTTP_404_NOT_FOUND)
     
+    email = user.email
     user.delete()
+    customerProducer.publish("user_deleted",{"email":email})
     return Response("User deleted")
