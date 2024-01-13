@@ -32,14 +32,18 @@ class RabbitMQConsumer():
                 self.create_customer(message['id'], message['name'], message['email'])
 
             elif properties.content_type == "user_updated":
-                self.update_customer(message['name'], message['old-email'], message['email'])
+                metadata = None
+                if 'metadata' in message:
+                    self.update_customer(name = '', email = '', old_email = message['email'], metadata = message['metadata'])
+                else:
+                    self.update_customer(message['name'], message['old-email'], message['email'], metadata)
             
             elif properties.content_type == "user_deleted":
                 self.delete_customer(message['email'])
 
             ch.basic_ack(delivery_tag=method.delivery_tag)
-        except:
-            print("Consumer process couldn't execute the message")
+        except Exception as e:
+            print(f"{e} -> Consumer process couldn't execute the message")
 
     def close(self):
         self.connection.close()
@@ -48,17 +52,26 @@ class RabbitMQConsumer():
         customer = stripe.Customer.create(
             name=name,
             email=email,
-            metadata={"product_id" : id}
+            metadata= { 
+                "product_id" : id, 
+                'readonly': True
+            }
         )
         return customer
     
-    def update_customer(self, name, old_email, email):
+    def update_customer(self, name, old_email, email, metadata):
         stripe_id = self.retreiveStripeId(old_email)
-        updated_customer = stripe.Customer.modify(
-            stripe_id,
-            name = name,
-            email = email,
-        )
+        if metadata is None:
+            updated_customer = stripe.Customer.modify(
+                stripe_id,
+                name = name,
+                email = email,
+            )
+        else:
+            updated_customer = stripe.Customer.modify(
+                stripe_id,
+                metadata=metadata
+            )
         return updated_customer
 
     def delete_customer(self, email):

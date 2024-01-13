@@ -5,5 +5,6 @@ urlpatterns = [
     path('users/', views.getUsers, name='users'),
     path('user/', views.addUser, name='user'),
     path("user_detail/<int:id>", views.userDetail, name="userInfo"),
-    path("delete_user/<int:id>", views.deleteUser, name="delteUser")
+    path("delete_user/<int:id>", views.deleteUser, name="delteUser"),
+    path("stripe_webhook/", views.stripeHook, name="stripe_webhook")
 ]
