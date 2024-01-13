@@ -20,5 +20,3 @@ This project manages a customer catalog on the backend with other external servi
 
 1. We would create a new module for that system's consumer file which will pop messages from its queue and update their system.
 2. We could also start each of these separate consumer files corresponding to these external systems as threads for more efficient working.
-
-I hope this helps! Let me know if you have any further questions. 😊
