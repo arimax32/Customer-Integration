@@ -1,0 +1,57 @@
+version: '3.9'
+services:
+  backend:
+    build:
+      context: ../../../Customer-Integration/
+      dockerfile: Dockerfile
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - 8000:8000
+    volumes:
+      - .:/app
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_completed_successfully
+
+  consumer:
+    build:
+      context: ../../../Customer-Integration/
+      dockerfile: Dockerfile
+    command: python -u /app/stripeWorker/consumer.py
+    volumes:
+      - ../stripeWorker:/app/stripeWorker
+    restart: on-failure
+    depends_on:
+      rabbitmq:
+        condition: service_completed_successfully
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 1
+
+  db:
+    image: mysql:8.0.35
+    environment:
+      MYSQL_DATABASE: Customer
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - .dbdata:/var/lib/mysql
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "--password=root"]
+      timeout: 10s
+      retries: 1
+
+volumes:
+  datadb:

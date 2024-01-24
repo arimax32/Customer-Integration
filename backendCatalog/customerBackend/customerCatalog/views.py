@@ -16,6 +16,7 @@ stripe.api_key = os.getenv("API_KEY")
 
 customerProducer = RabbitMQProducer(exchange_name="customerCatalog")
 
+# Rest API endpoint for adding a user
 @api_view(['POST'])
 def addUser(request) :
     serializer = UserSerializer(data = request.data)
@@ -31,6 +32,7 @@ def getUsers(request) :
     serializer = UserSerializer(users,many = True)
     return Response(serializer.data)
 
+# Rest API endpoint to update user information.
 @api_view(['GET','PUT'])
 def userDetail(request, id) :
     try:
@@ -52,6 +54,7 @@ def userDetail(request, id) :
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
+# Rest API endpoint for deleting user 
 @api_view(['DELETE'])
 def deleteUser(request, id) :
     try:
@@ -64,6 +67,7 @@ def deleteUser(request, id) :
     customerProducer.publish("user_deleted",{"email":email})
     return Response("User deleted")
 
+# Stripe Webhook endpoint 
 @api_view(['POST'])
 def stripeHook(request) :
     
@@ -75,6 +79,7 @@ def stripeHook(request) :
         )
     except ValueError as e:
         return Response(status=status.HTTP_400_BAD_REQUEST)
+    
     # Handle the event
     customer = event.data.object
     if event.type == 'customer.created':
@@ -85,6 +90,9 @@ def stripeHook(request) :
             if serializer.is_valid():
                 user_instance = serializer.save()
                 customerProducer.publish("user_updated",{"email": email, "metadata": {"product_id" : user_instance.id, "readonly": True}})
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
     elif event.type == 'customer.updated':
         id = customer.metadata['product_id']
         try:
@@ -99,6 +107,7 @@ def stripeHook(request) :
             serializer.save()
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
     elif event.type == 'customer.deleted':
         id = customer.metadata['product_id']
         try:
